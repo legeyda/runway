@@ -1,0 +1,21 @@
+#!/bin/sh
+set -eu
+
+main() {
+	# shellcheck disable=SC2145
+	run_"$@"
+}
+
+run_build() {
+	echo build
+}
+
+run_push() {
+	run_build
+	echo docker image push legeyda/runway:(git rev-parse)
+}
+
+main "$@"
+
+
+
