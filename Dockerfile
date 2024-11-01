@@ -1,7 +1,8 @@
 FROM ubuntu:24.04
 
-ARG RUNWAY_ROOT /opt/runway
-ARG RUNWAY_CHECKOUT "$RUNWAY_ROOT/checkout"
+ARG RUNWAY_USER=runway
+ARG RUNWAY_ROOT=/opt/runway
+ARG RUNWAY_CHECKOUT="$RUNWAY_ROOT/checkout"
 
 WORKDIR $RUNWAY_ROOT
 
@@ -14,11 +15,8 @@ ENV RUNWAY_BRANCH=
 ENV RUNWAY_UPDATE_DELAY=60
 
 
-
-RUN apt-get --yes install git && \
-	instaluseradd -M runway && \
-    mkdir $RUNWAY_ROOT/logs && \
-    chown -R runway:runway
+RUN apt-get update && apt-get --yes install git && \
+	useradd -M "$RUNWAY_USER" && chown -R "$RUNWAY_USER":"$RUNWAY_USER" "$RUNWAY_ROOT"
 
 COPY entrypoint.sh "$RUNWAY_ROOT"
 

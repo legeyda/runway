@@ -2,17 +2,20 @@
 set -eu
 
 main() {
+	test -z "${VERSION:-}" && VERSION="$(git describe --tags --abbrev=8 --always --dirty)"
+	test -z "${TAG:-}" && TAG="legeyda/runway:$VERSION"
+	
 	# shellcheck disable=SC2145
 	run_"$@"
 }
 
 run_build() {
-	echo build
+	docker build . --tag "$TAG"
 }
 
 run_push() {
 	run_build
-	echo docker image push legeyda/runway:(git rev-parse)
+	docker image push "$TAG"
 }
 
 main "$@"
