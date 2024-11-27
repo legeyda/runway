@@ -1,0 +1,96 @@
+#!/usr/bin/env shelduck_run
+
+main() {
+	set -eu
+	runway_load_config
+	bobshell_scope_mirror RUNWAY_SSH_ BOBSHELL_SSH_
+	runway_watch
+}
+
+runway_load_config() {
+	RUNWAY_INSTALL_NAME=runway
+	RUNWAY_INSTALL_CHROOT=
+	
+	bobshell_scope_write RUNWAY_INSTALL_ BOBSHELL_INSTALL_
+	bobshell_install_init
+
+	if ! bobshell_isset RUNWAY_REPO_PATH; then
+		RUNWAY_REPO_PATH=$(bobshell_install_find_localstatedir)
+		RUNWAY_REPO_PATH="$RUNWAY_REPO_PATH/checkout"
+	fi
+
+	bobshell_install_get_config env.sh var:runway_load_config || bobshell_die 'unable load config'
+	bobshell_preserve_env bobshell_eval var:runway_load_config
+
+	: "${RUNWAY_RUN_COMMAND:=./run install}"
+}
+
+runway_watch() {
+	while true; do
+		runway_check
+		sleep "${RUNWAY_DELAY:-60}"
+	done
+}
+
+runway_check() {
+	: "${runway_check_old_hash:=}"
+	runway_git_refresh
+	runway_check_new_hash=$(runway_git_hash)
+	if [ -n "$runway_check_old_hash" ] && [ "$runway_check_old_hash" = "$runway_check_new_hash" ]; then
+		return
+	fi
+
+	sh -euc "cd $RUNWAY_REPO_PATH; $RUNWAY_RUN_COMMAND"
+	runway_check_old_hash="$runway_check_new_hash"
+	unset runway_check_new_hash
+}
+
+runway_git_hash() {
+	if [ ! -d "$RUNWAY_REPO_PATH" ]; then
+		return
+	fi
+	sh -euc "cd '$RUNWAY_REPO_PATH' && git rev-parse HEAD"
+}
+
+
+runway_git() {
+	git --git-dir "$RUNWAY_REPO_PATH/.git" --work-tree="$RUNWAY_REPO_PATH" "$@"
+}
+
+runway_auth_git() {
+	bobshell_git_ssh_auth git --git-dir "$RUNWAY_REPO_PATH/.git" --work-tree="$RUNWAY_REPO_PATH" "$@"
+}
+
+
+
+runway_git_refresh() {
+	if [ -e "$RUNWAY_REPO_PATH" ]; then
+		if [ ! -d "$RUNWAY_REPO_PATH" ]; then
+			bobshell_die "$RUNWAY_REPO_PATH, when exists, expected to be directory" 
+		fi
+		if [ -z "$(ls -A "$RUNWAY_REPO_PATH")" ]; then
+		rmdir "$RUNWAY_REPO_PATH"
+		fi
+	fi
+
+	if [ ! -e "$RUNWAY_REPO_PATH" ]; then 
+		bobshell_git_ssh_auth git clone \
+				${RUNWAY_REPO_BRANCH:+ --branch "$RUNWAY_REPO_BRANCH"} --single-branch --recurse-submodules \
+				"$RUNWAY_REPO_URL" "$RUNWAY_REPO_PATH"
+	fi
+
+	runway_git reset --hard HEAD
+	if [ -z "${RUNWAY_REPO_BRANCH:-}" ]; then
+		RUNWAY_REPO_BRANCH="$(runway_git rev-parse --abbrev-ref HEAD)"
+	else
+		runway_git checkout "$RUNWAY_REPO_BRANCH"
+	fi
+	runway_auth_git fetch origin "$RUNWAY_REPO_BRANCH"
+	runway_git reset --hard "origin/$RUNWAY_REPO_BRANCH"
+}
+
+
+shelduck import https://raw.githubusercontent.com/legeyda/bobshell/refs/heads/unstable/install.sh
+shelduck import https://raw.githubusercontent.com/legeyda/bobshell/refs/heads/unstable/util.sh
+shelduck import https://raw.githubusercontent.com/legeyda/bobshell/refs/heads/unstable/git.sh
+shelduck import https://raw.githubusercontent.com/legeyda/bobshell/refs/heads/unstable/entry_point.sh

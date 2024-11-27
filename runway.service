@@ -1,0 +1,8 @@
+[Unit]
+Description=runway runner from git repo
+
+[Install]
+WantedBy=multi-user.target
+
+[Service]
+ExecStart={{RUNWAY_INSTALL_BINDIR}}/runway
