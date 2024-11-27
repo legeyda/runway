@@ -10,25 +10,25 @@ main() {
 runway_load_config() {
 	RUNWAY_INSTALL_NAME=runway
 	RUNWAY_INSTALL_CHROOT=
-	
-	bobshell_scope_write RUNWAY_INSTALL_ BOBSHELL_INSTALL_
+
+	bobshell_scope_write RUNWAY_ BOBSHELL_
 	bobshell_install_init
+	
+	bobshell_install_get_config env.sh var:runway_load_config || bobshell_die 'unable load config'
+	bobshell_preserve_env bobshell_eval var:runway_load_config
 
 	if ! bobshell_isset RUNWAY_REPO_PATH; then
 		RUNWAY_REPO_PATH=$(bobshell_install_find_localstatedir)
 		RUNWAY_REPO_PATH="$RUNWAY_REPO_PATH/checkout"
 	fi
-
-	bobshell_install_get_config env.sh var:runway_load_config || bobshell_die 'unable load config'
-	bobshell_preserve_env bobshell_eval var:runway_load_config
-
 	: "${RUNWAY_RUN_COMMAND:=./run install}"
+	: "${RUNWAY_DELAY:=60}"
 }
 
 runway_watch() {
 	while true; do
 		runway_check
-		sleep "${RUNWAY_DELAY:-60}"
+		sleep "$RUNWAY_DELAY"
 	done
 }
 
@@ -41,7 +41,7 @@ runway_check() {
 	fi
 
 	sh -euc "cd $RUNWAY_REPO_PATH; $RUNWAY_RUN_COMMAND"
-	runway_check_old_hash="$runway_check_new_hash"
+	runway_check_old_hash="$runway_check_new_hash" 
 	unset runway_check_new_hash
 }
 
