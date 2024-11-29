@@ -1,5 +1,5 @@
 #!/usr/bin/env shelduck_run
-set -eu
+set -eux
 
 shelduck import https://raw.githubusercontent.com/legeyda/bobshell/refs/heads/unstable/run.sh
 shelduck import https://raw.githubusercontent.com/legeyda/bobshell/refs/heads/unstable/scope.sh
@@ -11,6 +11,10 @@ shelduck import https://raw.githubusercontent.com/legeyda/bobshell/refs/heads/un
 on_start() {
 	set -x
 	: "${RUNWAY_BUILD_TARGET:=./target}"
+}
+
+run_docker_build() {
+	docker build . -t runway
 }
 
 run_clean() {
@@ -27,8 +31,8 @@ run_entrypoint() {
 }
 
 run_test_install() {
-	RUNWAY_INSTALL_NAME=runway
-	RUNWAY_INSTALL_CHROOT=./target/chroot
+	export RUNWAY_INSTALL_NAME=runway
+	export RUNWAY_INSTALL_ROOT=./target/test_install
 	RUNWAY_INSTALL_SYSTEMCTL=fake_systemctl
 
 
@@ -40,7 +44,7 @@ run_test_install() {
 	run_install
 	reset
 	
-	"$RUNWAY_INSTALL_CHROOT$RUNWAY_INSTALL_PREFIX/bin/$RUNWAY_INSTALL_NAME"
+	"$RUNWAY_INSTALL_DESTDIR$RUNWAY_INSTALL_BINDIR/$RUNWAY_INSTALL_NAME"
 }
 
 fake_systemctl() {
@@ -60,7 +64,7 @@ run_install() {
 	#
 	runway_src=$(cat runway)
 	runway_src=$(bobshell_replace "$runway_src" "RUNWAY_INSTALL_NAME=runway${bobshell_newline}" "RUNWAY_INSTALL_NAME=$RUNWAY_INSTALL_NAME${bobshell_newline}")
-	runway_src=$(bobshell_replace "$runway_src" "RUNWAY_INSTALL_CHROOT=${bobshell_newline}" "RUNWAY_INSTALL_CHROOT=$RUNWAY_INSTALL_CHROOT${bobshell_newline}")
+	runway_src=$(bobshell_replace "$runway_src" "RUNWAY_INSTALL_ROOT=${bobshell_newline}" "RUNWAY_INSTALL_ROOT=$RUNWAY_INSTALL_ROOT${bobshell_newline}")
 	printf %s "$runway_src" > "$RUNWAY_BUILD_TARGET/$RUNWAY_INSTALL_NAME"
 	bobshell_replace "$runway_src" RUNWAY_INSTALL_NAME=runway "RUNWAY_INSTALL_NAME=$RUNWAY_INSTALL_NAME" > "$RUNWAY_BUILD_TARGET/$RUNWAY_INSTALL_NAME"
 

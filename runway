@@ -1,7 +1,7 @@
 #!/usr/bin/env shelduck_run
 
 main() {
-	set -eu
+	set -eux
 	runway_load_config
 	bobshell_scope_mirror RUNWAY_SSH_ BOBSHELL_SSH_
 	runway_watch
@@ -9,19 +9,23 @@ main() {
 
 runway_load_config() {
 	RUNWAY_INSTALL_NAME=runway
-	RUNWAY_INSTALL_CHROOT=
+	RUNWAY_INSTALL_ROOT=
 
-	bobshell_scope_write RUNWAY_ BOBSHELL_
+	bobshell_scope_mirror RUNWAY_ BOBSHELL_
 	bobshell_install_init
+	bobshell_scope_mirror BOBSHELL_ RUNWAY_ 
 	
 	bobshell_install_get_config env.sh var:runway_load_config || bobshell_die 'unable load config'
 	bobshell_preserve_env bobshell_eval var:runway_load_config
 
 	if ! bobshell_isset RUNWAY_REPO_PATH; then
-		RUNWAY_REPO_PATH=$(bobshell_install_find_localstatedir)
-		RUNWAY_REPO_PATH="$RUNWAY_REPO_PATH/checkout"
+		RUNWAY_REPO_PATH="$RUNWAY_INSTALL_DATADIR/$RUNWAY_INSTALL_NAME/checkout"
 	fi
+
+
+	
 	: "${RUNWAY_RUN_COMMAND:=./run install}"
+	: "${RUNWAY_RUN_ENV:=}"
 	: "${RUNWAY_DELAY:=60}"
 }
 
@@ -39,10 +43,13 @@ runway_check() {
 	if [ -n "$runway_check_old_hash" ] && [ "$runway_check_old_hash" = "$runway_check_new_hash" ]; then
 		return
 	fi
-
-	sh -euc "cd $RUNWAY_REPO_PATH; $RUNWAY_RUN_COMMAND"
+	runway_run_command
 	runway_check_old_hash="$runway_check_new_hash" 
 	unset runway_check_new_hash
+}
+
+runway_run_command() {
+	sh -euc "cd $RUNWAY_REPO_PATH; $RUNWAY_RUN_ENV; $RUNWAY_RUN_COMMAND"
 }
 
 runway_git_hash() {
@@ -91,6 +98,7 @@ runway_git_refresh() {
 
 
 shelduck import https://raw.githubusercontent.com/legeyda/bobshell/refs/heads/unstable/install.sh
+shelduck import https://raw.githubusercontent.com/legeyda/bobshell/refs/heads/unstable/scope.sh
 shelduck import https://raw.githubusercontent.com/legeyda/bobshell/refs/heads/unstable/util.sh
 shelduck import https://raw.githubusercontent.com/legeyda/bobshell/refs/heads/unstable/git.sh
 shelduck import https://raw.githubusercontent.com/legeyda/bobshell/refs/heads/unstable/entry_point.sh
