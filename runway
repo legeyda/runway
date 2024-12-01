@@ -3,6 +3,9 @@
 main() {
 	set -eux
 	runway_load_config
+	bobshell_require_not_empty "$RUNWAY_REPO_URL" 'repo url not set'
+
+
 	bobshell_scope_mirror RUNWAY_SSH_ BOBSHELL_SSH_
 	runway_watch
 }
@@ -49,7 +52,8 @@ runway_check() {
 }
 
 runway_run_command() {
-	sh -euc "cd $RUNWAY_REPO_PATH; $RUNWAY_RUN_ENV; $RUNWAY_RUN_COMMAND"
+	export RUNWAY_RUN_ENV
+	sh -euc "cd $RUNWAY_REPO_PATH; eval \"\$RUNWAY_RUN_ENV\"; $RUNWAY_RUN_COMMAND"
 }
 
 runway_git_hash() {

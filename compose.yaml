@@ -1,0 +1,20 @@
+services:
+  runway:
+    image: runway
+    restart: always
+    pull_policy: never
+    environment:
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD?postgres password not set}
+    ports:
+      - ${POSTGRES_PORT:-5432}:5432
+    volumes:
+      - /opt/docker/payregistry/postgresql/data:/var/lib/postgresql/data
+      - /opt/docker/payregistry/logs/postgresql:/var/lib/postgresql/pg_log
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready", "-d", "db_prod"]
+    logging:
+      driver: "json-file"
+      options:
+        max-file: "10"
+        max-size: "30m"
+        compress: "true"
