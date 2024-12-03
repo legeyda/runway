@@ -15,28 +15,12 @@ on_start() {
 	: "${RUNWAY_INSTALL_NAME:=runway}"
 }
 
-run_prepare_docker_build() {
-	# install
-	export RUNWAY_INSTALL_DESTDIR=./target/docker-build
-	if [ root = "${RUNWAY_DOCKER_USER:-root}" ]; then
-		RUNWAY_INSTALL_ROLE=SYSTEM
-	else
-		RUNWAY_INSTALL_ROLE=USER
-	fi
-	rm -rf "$RUNWAY_INSTALL_DESTDIR"
-	run_install
-	
-	go_install_supervisord_program
-}
-
 run_docker_build() {
-	run_prepare_docker_build
-
 	: "${RUNWAY_DOCKER_IMAGE_NAME:=$RUNWAY_INSTALL_NAME}"
 	if [ -z "${RUNWAY_DOCKER_IMAGE_TAG:-}" ]; then
 		RUNWAY_DOCKER_IMAGE_TAG=$(git_version)
 	fi
-	docker build . --tag "$RUNWAY_DOCKER_IMAGE_NAME:$RUNWAY_DOCKER_IMAGE_TAG"
+	docker build . --progress=plain --tag "$RUNWAY_DOCKER_IMAGE_NAME:$RUNWAY_DOCKER_IMAGE_TAG"
 }
 
 run_docker_debug() {
@@ -46,23 +30,15 @@ run_docker_debug() {
 	if [ ! -e "$run_docker_debug_mount_logs" ]; then
 		#install --directory --owner 200000 --group 200000 "$run_docker_debug_mount_logs"
 		mkdir -p "$run_docker_debug_mount_logs"
-		sudo 200000:200000 "$run_docker_debug_mount_logs"
+		sudo chown 200000:200000 "$run_docker_debug_mount_logs"
 	fi
 	
 
-	run_docker_debug_known_hosts=$(bobshell_ssh_keyscan github.com)
-
-
 	docker run --name debug-runway \
-		--env RUNWAY_SSH_KNOWN_HOSTS="$run_docker_debug_known_hosts" \
-		--env RUNWAY_REPO_URL=git@github.com:legeyda/tailsitter.git \
+		--env "RUNWAY_REPO_URL=git@github.com:legeyda/tailsitter.git" \
+		--env "RUNWAY_SSH_IDENTITY=$RUNWAY_SSH_IDENTITY" \
 		--mount "type=bind,source=$run_docker_debug_mount_logs,target=/var/log/supervisor" \
 		"$RUNWAY_DOCKER_IMAGE_NAME:$RUNWAY_DOCKER_IMAGE_TAG"
-}
-
-run_docker_run() {
-	run_docker_build
-	docker run --name "$RUNWAY_INSTALL_NAME" --rm "$RUNWAY_DOCKER_IMAGE_NAME:$RUNWAY_DOCKER_IMAGE_TAG"
 }
 
 git_version() {
@@ -75,16 +51,8 @@ run_clean() {
 	bobshell_handle_subcommand "$@"
 }
 
-run_entrypoint() {
-	: "${RUNWAY_REPO_PATH:=target/test-checkout}"
-	export RUNWAY_PATH
-	: "${RUNWAY_REPO_URL=git@github.com:legeyda/bobshell.git}"
-	export RUNWAY_REPO
-	shelduck_run file://./entrypoint.sh
-}
 
 run_test_install() {
-	export RUNWAY_INSTALL_NAME=runway
 	export RUNWAY_INSTALL_ROOT=./target/test_install
 	RUNWAY_INSTALL_SYSTEMCTL=fake_systemctl
 
@@ -106,10 +74,9 @@ fake_systemctl() {
 run_install() {
 	mkdir -p "$RUNWAY_BUILD_TARGET"
 
+
 	#
-	bobshell_scope_mirror RUNWAY_INSTALL_ BOBSHELL_INSTALL_
-	bobshell_install_init
-	bobshell_scope_mirror BOBSHELL_INSTALL_ RUNWAY_INSTALL_
+	runway_install_init
 
 
 	#
@@ -133,15 +100,32 @@ run_install() {
 
 }
 
-go_install_systemd_service() {
+runway_install_init() {
+	if [ -z "${RUNWAY_SSH_KNOWN_HOSTS:-}" ]; then
+		RUNWAY_SSH_KNOWN_HOSTS=$(bobshell_ssh_keyscan github.com)
+	fi
+
+	bobshell_scope_mirror RUNWAY_INSTALL_ BOBSHELL_INSTALL_
+	bobshell_install_init
+	bobshell_scope_mirror BOBSHELL_INSTALL_ RUNWAY_INSTALL_
+}
+
+run_install_systemd_service() {
+	runway_install_init
 	bobshell_mustache file:runway.service "file:$RUNWAY_BUILD_TARGET/$RUNWAY_INSTALL_NAME.service"
 	bobshell_install_service "file:$RUNWAY_BUILD_TARGET/$RUNWAY_INSTALL_NAME.service" "$RUNWAY_INSTALL_NAME.service"
 }
 
 
-go_install_supervisord_program() {
+run_install_supervisord_program() {
+	runway_install_init
 	mkdir -p "$RUNWAY_INSTALL_DESTDIR/etc/supervisor/conf.d"
 	bobshell_interpolate file:runway.conf "file:$RUNWAY_INSTALL_DESTDIR/etc/supervisor/conf.d/runway.conf"
+	run_install_supervisord_program_supervisorctl="${RUNWAY_INSTALL_DESTDIR:-}${RUNWAY_INSTALL_ROOT:-}/usr/bin/supervisorctl"
+	if bobshell_command_available "$run_install_supervisord_program_supervisorctl"; then
+		"$run_install_supervisord_program_supervisorctl" reread
+		"$run_install_supervisord_program_supervisorctl" update
+	fi
 }
 
 shelduck import https://raw.githubusercontent.com/legeyda/bobshell/refs/heads/unstable/entry_point.sh

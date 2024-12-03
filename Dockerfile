@@ -1,4 +1,27 @@
+FROM ubuntu:24.04 AS build
+
+ARG WORKDIR=/tmp/runway
+WORKDIR $WORKDIR
+COPY . ./src
+ENV PATH="$PATH:/opt/bin"
+
+
+RUN <<EOF
+	set -eu
+	apt-get  update
+	apt-get --yes install curl dnsutils ssh
+	rm -rf /var/lib/apt/lists/*
+	shelduck_installer=$(curl -fsS https://raw.githubusercontent.com/legeyda/shelduck/refs/heads/main/install.sh)
+	eval "$shelduck_installer"
+	cd $WORKDIR/src
+	export RUNWAY_INSTALL_DESTDIR=$WORKDIR/dest
+	./run install
+	./run install_supervisord_program
+EOF
+
+
 FROM ubuntu:24.04
+RUN	apt-get update
 
 
 ARG RUNWAY_DOCKER_USER=root
@@ -7,26 +30,25 @@ ARG RUNWAY_INSTALL_CONFDIR
 
 WORKDIR $RUNWAY_DATA
 
-ENV RUNWAY_SSH_KNOWN_HOSTS_FILE=
-ENV RUNWAY_SSH_KNOWN_HOSTS=
-ENV RUNWAY_SSH_KEY_FILE=
-ENV RUNWAY_SSH_KEY=
-ENV RUNWAY_REPO_URL=
+# ENV RUNWAY_SSH_KNOWN_HOSTS_FILE
+# ENV RUNWAY_SSH_KNOWN_HOSTS
+# ENV RUNWAY_SSH_IDENTITY_FILE
+# ENV RUNWAY_SSH_IDENTITY
+# ENV RUNWAY_REPO_URL
 ENV RUNWAY_REPO_PATH="$RUNWAY_DATA/checkout"
-ENV RUNWAY_REPO_BRANCH=
+# ENV RUNWAY_REPO_BRANCH
 ENV RUNWAY_REFRESH_DELAY=60
 ENV RUNWAY_RUN_COMMAND="./run install"
-ENV RUNWAY_RUN_ENV=
+# ENV RUNWAY_RUN_ENV
 
 ENV PATH="$PATH:/opt/bin"
 
 
-RUN	set -eu; apt-get --yes update; apt-get --yes install supervisor git curl
-
 RUN	<<EOF
-	# set -eu
-	# apt-get --yes update
-	#apt-get --yes install supervisor git curl
+	set -eu
+	apt-get --yes update
+	apt-get --yes install supervisor git curl
+	rm -rf /var/lib/apt/lists/*
 	shelduck_lib=$(curl -fsS https://raw.githubusercontent.com/legeyda/shelduck/refs/heads/main/install.sh)
 	eval "$shelduck_lib"
 	if [ root != "$RUNWAY_DOCKER_USER" ]; then
@@ -36,10 +58,7 @@ RUN	<<EOF
 	fi
 EOF
 
-# COPY runway.conf /etc/supervisor/conf.d
-COPY target/docker-build /
-
-
+COPY --from=build /tmp/runway/dest /
 
 USER "$RUNWAY_DOCKER_USER"
 ENTRYPOINT ["/bin/sh", "-c", "set -eux; \"$0\" \"$@\""]

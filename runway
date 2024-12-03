@@ -14,12 +14,15 @@ runway_load_config() {
 	RUNWAY_INSTALL_NAME=runway
 	RUNWAY_INSTALL_ROOT=
 
-	bobshell_scope_mirror RUNWAY_ BOBSHELL_
+	bobshell_scope_mirror RUNWAY_INSTALL_ BOBSHELL_INSTALL_
 	bobshell_install_init
-	bobshell_scope_mirror BOBSHELL_ RUNWAY_ 
-	
+	bobshell_scope_mirror BOBSHELL_INSTALL_ RUNWAY_INSTALL_
+
 	bobshell_install_get_config env.sh var:runway_load_config || bobshell_die 'unable load config'
 	bobshell_preserve_env bobshell_eval var:runway_load_config
+
+	bobshell_scope_mirror RUNWAY_SSH_ BOBSHELL_SSH_
+	
 
 	if ! bobshell_isset RUNWAY_REPO_PATH; then
 		RUNWAY_REPO_PATH="$RUNWAY_INSTALL_DATADIR/$RUNWAY_INSTALL_NAME/checkout"
