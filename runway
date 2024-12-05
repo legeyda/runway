@@ -54,7 +54,7 @@ runway_check() {
 
 runway_run_command() {
 	export RUNWAY_RUN_ENV
-	sh -eucx "cd '$RUNWAY_REPO_PATH'; eval \"\$RUNWAY_RUN_ENV\"; $RUNWAY_RUN_COMMAND"
+	sh -euc "cd '$RUNWAY_REPO_PATH'; set -o allexport; eval \"\$RUNWAY_RUN_ENV\"; $RUNWAY_RUN_COMMAND"
 }
 
 runway_git_hash() {
