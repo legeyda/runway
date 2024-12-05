@@ -27,8 +27,6 @@ runway_load_config() {
 	if ! bobshell_isset RUNWAY_REPO_PATH; then
 		RUNWAY_REPO_PATH="$RUNWAY_INSTALL_DATADIR/$RUNWAY_INSTALL_NAME/checkout"
 	fi
-
-
 	
 	: "${RUNWAY_RUN_COMMAND:=./run install}"
 	: "${RUNWAY_RUN_ENV:=}"
@@ -56,7 +54,7 @@ runway_check() {
 
 runway_run_command() {
 	export RUNWAY_RUN_ENV
-	sh -euc "cd $RUNWAY_REPO_PATH; eval \"\$RUNWAY_RUN_ENV\"; $RUNWAY_RUN_COMMAND"
+	sh -eucx "cd '$RUNWAY_REPO_PATH'; eval \"\$RUNWAY_RUN_ENV\"; $RUNWAY_RUN_COMMAND"
 }
 
 runway_git_hash() {
