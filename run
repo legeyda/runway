@@ -9,16 +9,29 @@ shelduck import https://raw.githubusercontent.com/legeyda/bobshell/refs/heads/un
 shelduck import https://raw.githubusercontent.com/legeyda/bobshell/refs/heads/unstable/require.sh
 shelduck import https://raw.githubusercontent.com/legeyda/bobshell/refs/heads/unstable/git.sh
 
+shelduck import https://raw.githubusercontent.com/legeyda/bobshell/refs/heads/unstable/git/version.sh
+
 on_start() {
 	set -x
 	: "${RUNWAY_BUILD_TARGET:=./target}"
 	: "${RUNWAY_INSTALL_NAME:=runway}"
 }
 
+run_clean() {
+	rm -rf "$RUNWAY_BUILD_TARGET"
+	bobshell_handle_subcommand "$@"
+}
+
+
+
+
+
+
 run_docker_build() {
 	: "${RUNWAY_DOCKER_IMAGE_NAME:=$RUNWAY_INSTALL_NAME}"
 	if [ -z "${RUNWAY_DOCKER_IMAGE_TAG:-}" ]; then
-		RUNWAY_DOCKER_IMAGE_TAG=$(git_version)
+		bobshell_git_version
+		bobshell_result_check RUNWAY_DOCKER_IMAGE_TAG || RUNWAY_DOCKER_IMAGE_TAG=noversion
 	fi
 	docker build . --progress=plain --tag "$RUNWAY_DOCKER_IMAGE_NAME:$RUNWAY_DOCKER_IMAGE_TAG"
 }
@@ -34,35 +47,28 @@ run_docker_debug() {
 	fi
 	
 
-	docker run --name debug-runway \
+	docker run --name debug-runway --rm \
 		--env "RUNWAY_REPO_URL=git@github.com:legeyda/tailsitter.git" \
 		--env "RUNWAY_SSH_IDENTITY=$RUNWAY_SSH_IDENTITY" \
 		--mount "type=bind,source=$run_docker_debug_mount_logs,target=/var/log/supervisor" \
 		"$RUNWAY_DOCKER_IMAGE_NAME:$RUNWAY_DOCKER_IMAGE_TAG"
 }
 
-git_version() {
-	# --tags Instead of using only the annotated tags, use any tag found in refs/tags namespace. This option enables matching a lightweight (non-annotated) tag.
-	git describe --abbrev=8 --always --dirty --broken
-}
-
-run_clean() {
-	rm -rf "$RUNWAY_BUILD_TARGET"
-	bobshell_handle_subcommand "$@"
-}
 
 
 run_test_install() {
-	export RUNWAY_INSTALL_ROOT=./target/test_install
+	export RUNWAY_INSTALL_DESTDIR=$RUNWAY_BUILD_TARGET/test_install
 	RUNWAY_INSTALL_SYSTEMCTL=fake_systemctl
 
 
 	RUNWAY_REPO_URL="git@github.com:legeyda/tailsitter.git"
 	RUNWAY_RUN_ENV='x=1; y=2'
 	RUNWAY_RUN_COMMAND='./run args from installer'
-
+	BOBSHELL_INSTALL_SYSTEMCTL=fake-systectl
 
 	run_install
+	run_install_systemd_service
+
 	
 	"$RUNWAY_INSTALL_DESTDIR$RUNWAY_INSTALL_BINDIR/$RUNWAY_INSTALL_NAME"
 }
@@ -71,9 +77,10 @@ fake_systemctl() {
 	printf 'FAKE SYSTEMCTL CALL: systemctl %s\n' "$*"
 }
 
+
+
 run_install() {
 	mkdir -p "$RUNWAY_BUILD_TARGET"
-
 
 	#
 	runway_install_init
@@ -81,8 +88,8 @@ run_install() {
 
 	#
 	runway_src=$(cat runway)
-	runway_src=$(bobshell_replace "$runway_src" "RUNWAY_INSTALL_NAME=runway${bobshell_newline}" "RUNWAY_INSTALL_NAME=$RUNWAY_INSTALL_NAME${bobshell_newline}")
-	runway_src=$(bobshell_replace "$runway_src" "RUNWAY_INSTALL_ROOT=${bobshell_newline}" "RUNWAY_INSTALL_ROOT=$RUNWAY_INSTALL_ROOT${bobshell_newline}")
+	runway_src=$(bobshell_replace "$runway_src" "RUNWAY_DEFAULT_INSTALL_NAME=runway${bobshell_newline}" "RUNWAY_DEFAULT_INSTALL_NAME=$RUNWAY_INSTALL_NAME${bobshell_newline}")
+	runway_src=$(bobshell_replace "$runway_src" "RUNWAY_DEFAULT_INSTALL_ROOT=${bobshell_newline}" "RUNWAY_DEFAULT_INSTALL_ROOT=$RUNWAY_INSTALL_ROOT${bobshell_newline}")
 	printf %s "$runway_src" > "$RUNWAY_BUILD_TARGET/$RUNWAY_INSTALL_NAME"
 	bobshell_replace "$runway_src" RUNWAY_INSTALL_NAME=runway "RUNWAY_INSTALL_NAME=$RUNWAY_INSTALL_NAME" > "$RUNWAY_BUILD_TARGET/$RUNWAY_INSTALL_NAME"
 
@@ -109,6 +116,8 @@ runway_install_init() {
 	bobshell_install_init
 	bobshell_scope_mirror BOBSHELL_INSTALL_ RUNWAY_INSTALL_
 }
+
+
 
 run_install_systemd_service() {
 	runway_install_init

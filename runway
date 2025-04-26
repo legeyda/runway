@@ -1,34 +1,29 @@
 #!/usr/bin/env shelduck_run
 
 main() {
-	set -eux
+	set -eu
 	runway_load_config
-	bobshell_require_not_empty "$RUNWAY_REPO_URL" 'repo url not set'
-
-
-	bobshell_scope_mirror RUNWAY_SSH_ BOBSHELL_SSH_
 	runway_watch
 }
 
 runway_load_config() {
-	RUNWAY_INSTALL_NAME=runway
-	RUNWAY_INSTALL_ROOT=
+	RUNWAY_DEFAULT_INSTALL_NAME=runway
+	RUNWAY_DEFAULT_INSTALL_ROOT=
+
+	: "${RUNWAY_INSTALL_NAME:=$RUNWAY_DEFAULT_INSTALL_NAME}"
+	: "${RUNWAY_INSTALL_ROOT:=$RUNWAY_DEFAULT_INSTALL_ROOT}"
 
 	bobshell_scope_mirror RUNWAY_INSTALL_ BOBSHELL_INSTALL_
 	bobshell_install_init
 	bobshell_scope_mirror BOBSHELL_INSTALL_ RUNWAY_INSTALL_
 
-	bobshell_install_get_config env.sh var:runway_load_config || bobshell_die 'unable load config'
+	bobshell_install_get_config env.sh var:runway_load_config
 	bobshell_preserve_env bobshell_eval var:runway_load_config
 
 	bobshell_scope_mirror RUNWAY_SSH_ BOBSHELL_SSH_
-	
-
-	if ! bobshell_isset RUNWAY_REPO_PATH; then
-		RUNWAY_REPO_PATH="$RUNWAY_INSTALL_DATADIR/$RUNWAY_INSTALL_NAME/checkout"
-	fi
-	
-	: "${RUNWAY_RUN_COMMAND:=./run install}"
+	: "${RUNWAY_REPO_PATH:=$RUNWAY_INSTALL_DATADIR/$RUNWAY_INSTALL_NAME/checkout}"	
+	: "${RUNWAY_RUN_INSTALL:=${RUNWAY_RUN_COMMAND:-./run install}}"
+	: "${RUNWAY_RUN_TIMER:=${RUNWAY_RUN_COMMAND:-./run timer}}"
 	: "${RUNWAY_RUN_ENV:=}"
 	: "${RUNWAY_DELAY:=60}"
 }
@@ -45,23 +40,26 @@ runway_check() {
 	runway_git_refresh
 	runway_check_new_hash=$(runway_git_hash)
 	if [ -n "$runway_check_old_hash" ] && [ "$runway_check_old_hash" = "$runway_check_new_hash" ]; then
-		return
+		runway_run_command "$RUNWAY_RUN_TIMER"
+	else
+		runway_run_command "$RUNWAY_RUN_INSTALL"
+		runway_check_old_hash="$runway_check_new_hash" 
 	fi
-	runway_run_command
-	runway_check_old_hash="$runway_check_new_hash" 
 	unset runway_check_new_hash
 }
 
-runway_run_command() {
-	export RUNWAY_RUN_ENV
-	sh -euc "cd '$RUNWAY_REPO_PATH'; set -o allexport; eval \"\$RUNWAY_RUN_ENV\"; $RUNWAY_RUN_COMMAND"
-}
+runway_run_command() (
+	cd "$RUNWAY_REPO_PATH"
+	set -o allexport
+	bobshell_eval var:RUNWAY_RUN_ENV
+	bobshell_eval "$1"
+)
 
 runway_git_hash() {
 	if [ ! -d "$RUNWAY_REPO_PATH" ]; then
 		return
 	fi
-	sh -euc "cd '$RUNWAY_REPO_PATH' && git rev-parse HEAD"
+	( cd "$RUNWAY_REPO_PATH" && git rev-parse HEAD )
 }
 
 
@@ -70,7 +68,7 @@ runway_git() {
 }
 
 runway_auth_git() {
-	bobshell_git_ssh_auth git --git-dir "$RUNWAY_REPO_PATH/.git" --work-tree="$RUNWAY_REPO_PATH" "$@"
+	bobshell_git_ssh_auth runway_git "$@"
 }
 
 
@@ -81,7 +79,7 @@ runway_git_refresh() {
 			bobshell_die "$RUNWAY_REPO_PATH, when exists, expected to be directory" 
 		fi
 		if [ -z "$(ls -A "$RUNWAY_REPO_PATH")" ]; then
-		rmdir "$RUNWAY_REPO_PATH"
+			rmdir "$RUNWAY_REPO_PATH"
 		fi
 	fi
 
