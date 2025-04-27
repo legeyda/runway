@@ -4,15 +4,15 @@ ARG RUNWAY_DOCKER_USER=root
 
 ENV PATH="$PATH:/opt/bin"
 
-COPY . /src
-
 RUN apt-get --yes update && \
     apt-get --yes install supervisor dnsutils git curl && \
 	rm -rf /var/lib/apt/lists/*
 
+COPY . /src
+
 RUN shelduck_install_script=$(curl --fail --silent --show-error --location https://github.com/legeyda/shelduck/releases/latest/download/install.sh) && \
 	eval "$shelduck_install_script" && \
-	( cd /src && ./run install ) && \
+	( cd /src && ./run install && ./run install_supervisord_program ) && \
 	rm -rf /src && \
 	if [ root != "$RUNWAY_DOCKER_USER" ]; then \
 		useradd -M $RUNWAY_DOCKER_USER && \

@@ -37,6 +37,8 @@ run_docker_build() {
 }
 
 run_docker_debug() {
+	. ~/.local/share/hoid/common/env.sh
+
 	run_docker_build
 
 	run_docker_debug_mount_logs="$RUNWAY_BUILD_TARGET/logs"
@@ -46,10 +48,12 @@ run_docker_debug() {
 		sudo chown 200000:200000 "$run_docker_debug_mount_logs"
 	fi
 	
+	
 
+	docker stop debug-runway 2>/dev/null || true
 	docker run --name debug-runway --rm \
-		--env "RUNWAY_REPO_URL=git@github.com:legeyda/tailsitter.git" \
-		--env "RUNWAY_SSH_IDENTITY=$RUNWAY_SSH_IDENTITY" \
+		--env "RUNWAY_REPO_URL=https://github.com/legeyda/tailsitter.git" \
+		--env TAILSITTER_SECRET_PASSWORD \
 		--mount "type=bind,source=$run_docker_debug_mount_logs,target=/var/log/supervisor" \
 		"$RUNWAY_DOCKER_IMAGE_NAME:$RUNWAY_DOCKER_IMAGE_TAG"
 }
@@ -130,11 +134,13 @@ run_install_supervisord_program() {
 	runway_install_init
 	mkdir -p "$RUNWAY_INSTALL_DESTDIR/etc/supervisor/conf.d"
 	bobshell_interpolate file:runway.conf "file:$RUNWAY_INSTALL_DESTDIR/etc/supervisor/conf.d/runway.conf"
-	run_install_supervisord_program_supervisorctl="${RUNWAY_INSTALL_DESTDIR:-}${RUNWAY_INSTALL_ROOT:-}/usr/bin/supervisorctl"
-	if bobshell_command_available "$run_install_supervisord_program_supervisorctl"; then
-		"$run_install_supervisord_program_supervisorctl" reread
-		"$run_install_supervisord_program_supervisorctl" update
-	fi
+	# run_install_supervisord_program_supervisorctl="${RUNWAY_INSTALL_DESTDIR:-}${RUNWAY_INSTALL_ROOT:-}/usr/bin/supervisorctl"
+	# if bobshell_command_available "$run_install_supervisord_program_supervisorctl"; then
+	# 	"$run_install_supervisord_program_supervisorctl" reread
+	# 	"$run_install_supervisord_program_supervisorctl" update
+	# 	"$run_install_supervisord_program_supervisorctl" start runway
+	# fi
+	# UNSET run_install_supervisord_program_supervisorctl
 }
 
 shelduck import https://raw.githubusercontent.com/legeyda/bobshell/refs/heads/unstable/entry_point.sh
