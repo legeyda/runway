@@ -20,6 +20,9 @@ RUN shelduck_install_script=$(curl --fail --silent --show-error --location https
 		chown -R $RUNWAY_DOCKER_USER:$RUNWAY_DOCKER_USER /opt/$RUNWAY_DOCKER_USER; \
 	fi
 
+HEALTHCHECK --interval=10s --timeout=10s --retries=10 \
+		CMD	supervisorctl status | grep -q "RUNNING"
+
 USER "$RUNWAY_DOCKER_USER"
 ENTRYPOINT ["/bin/sh", "-c", "set -eux; \"$0\" \"$@\""]
 CMD ["supervisord", "--nodaemon", "--configuration", "/etc/supervisor/supervisord.conf"]
